@@ -362,6 +362,17 @@
       background: radial-gradient(ellipse at top, rgba(232,184,48,0.17), transparent 72%);
       pointer-events: none;
     }
+    #support::after, #trophy::after {
+      background: radial-gradient(ellipse at top, rgba(232,184,48,0.26), transparent 72%);
+      height: 210px;
+    }
+    #sponsors::after {
+      background: radial-gradient(ellipse at top, rgba(232,184,48,0.10), transparent 72%);
+    }
+    #contact::after {
+      background: radial-gradient(ellipse at top, rgba(232,184,48,0.24), transparent 72%);
+      height: 210px;
+    }
     .section-header { text-align: center; margin-bottom: clamp(3rem, 6vw, 4.5rem); }
     .section-header h2 {
       font-size: clamp(2.1rem, 4.2vw, 3.2rem);
@@ -872,11 +883,13 @@
       .scroll-cue   { display: none; }
     }
 
-    /* ─── Journey line ─── */
+    /* ─── Journey line & river flow ─── */
+    #flow { will-change: transform; }
     #journey-line {
       position: absolute; top: 0; left: 0;
       z-index: -1; pointer-events: none;
       overflow: visible;
+      will-change: transform;
     }
     #journey-line .jl-glow  { stroke: var(--gold); stroke-width: 7; opacity: 0.18; fill: none; stroke-linecap: round; }
     #journey-line .jl-path  { stroke: var(--gold-light); stroke-width: 2; opacity: 0.75; fill: none; stroke-linecap: round; }
@@ -1015,6 +1028,8 @@
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><polyline points="7 13 12 18 17 13"/></svg>
   </a>
 </header>
+
+<div id="flow">
 
 <!-- ABOUT -->
 <section id="about">
@@ -1433,6 +1448,8 @@
   </div>
 </section>
 
+</div>
+
 <!-- FOOTER -->
 <footer>
   <p><strong>Saints Car Show 2026</strong> &nbsp;·&nbsp; Saint Augustine High School Car Club &nbsp;·&nbsp; North Park, San Diego &nbsp;·&nbsp; Benefiting Hogar Infantil La Gloria Orphanage, Tijuana<br>Trophies handcrafted by <strong>California Waterjet</strong></p>
@@ -1505,36 +1522,57 @@
   window.addEventListener('scroll', updateCta, { passive: true });
   updateCta();
 
-  // Journey line: a gold thread that draws itself down the page,
-  // weaving through each section title as you scroll
+  // Journey line: a gold river that winds bank-to-bank down the open
+  // margins, past every section header, while the page sways with the
+  // current as you scroll
   (function () {
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var svg = null, glowEl = null, pathEl = null, spark = null, halo = null;
-    var total = 0, startY = 0, endY = 0;
+    var total = 0, startY = 0, endY = 0, pageCx = 0;
+    var flow = document.getElementById('flow');
+    var swayCur = 0, swayTarget = 0;
 
-    function nodePoints() {
+    function isMobile() { return window.matchMedia('(max-width: 760px)').matches; }
+
+    function nodeEls() {
       var els = [];
       document.querySelectorAll('section .label').forEach(function (l) { els.push(l); });
-      var logo = document.querySelector('#contact .cta-logo');
-      if (logo) els.push(logo);
       return els;
     }
 
     function build() {
-      if (window.matchMedia('(max-width: 760px)').matches) return;
       var old = document.getElementById('journey-line');
       if (old) old.remove();
+      svg = glowEl = pathEl = spark = halo = null;
+      if (isMobile()) return;
       var hero = document.getElementById('hero');
       if (!hero) return;
+      if (flow) flow.style.transform = '';
       var baseY = window.scrollY || window.pageYOffset;
+      var cw = document.documentElement.clientWidth;
+      pageCx = cw / 2;
+      // riverbanks: just outside the content column, clamped to the screen
+      var containerHalf = Math.min(560, (cw - 40) / 2);
+      var gutter = Math.max(30, (pageCx - containerHalf) * 0.55);
+      var xLeft  = Math.max(28, pageCx - (containerHalf + gutter));
+      var xRight = Math.min(cw - 28, pageCx + (containerHalf + gutter));
+
       var pts = [];
       var heroR = hero.getBoundingClientRect();
-      pts.push([document.documentElement.clientWidth / 2, heroR.bottom + baseY + 8]);
-      nodePoints().forEach(function (el) {
+      pts.push([pageCx, heroR.bottom + baseY + 8]);
+      var els = nodeEls();
+      els.forEach(function (el, i) {
         var r = el.getBoundingClientRect();
-        pts.push([r.left + r.width / 2, r.top + r.height / 2 + baseY]);
+        var x = (i % 2 === 0) ? xLeft : xRight;
+        pts.push([x, r.top + r.height / 2 + baseY]);
       });
+      var logo = document.querySelector('#contact .cta-logo');
+      if (logo) {
+        var lr = logo.getBoundingClientRect();
+        pts.push([pageCx, lr.top + lr.height / 2 + baseY]);
+      }
       if (pts.length < 3) return;
+
       var d = 'M ' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
       for (var i = 1; i < pts.length; i++) {
         var p0 = pts[i - 1], p1 = pts[i], dy = p1[1] - p0[1];
@@ -1546,7 +1584,7 @@
       var h = document.documentElement.scrollHeight;
       svg = document.createElementNS(NS, 'svg');
       svg.id = 'journey-line';
-      svg.setAttribute('width', document.documentElement.clientWidth);
+      svg.setAttribute('width', cw);
       svg.setAttribute('height', h);
       svg.setAttribute('aria-hidden', 'true');
       glowEl = document.createElementNS(NS, 'path');
@@ -1556,7 +1594,7 @@
       halo = document.createElementNS(NS, 'circle');
       halo.setAttribute('class', 'jl-spark-halo'); halo.setAttribute('r', '11');
       spark = document.createElementNS(NS, 'circle');
-      spark.setAttribute('class', 'jl-spark'); spark.setAttribute('r', '3.5');
+      spark.setAttribute('class', 'jl-spark'); spark.setAttribute('r', '4');
       svg.appendChild(glowEl); svg.appendChild(pathEl); svg.appendChild(halo); svg.appendChild(spark);
       document.body.appendChild(svg);
       total = pathEl.getTotalLength();
@@ -1573,21 +1611,42 @@
     var ticking = false;
     function update() {
       ticking = false;
-      if (!pathEl || reduce) return;
-      var drawY = (window.scrollY || window.pageYOffset) + window.innerHeight * 0.55;
-      var t = Math.max(0, Math.min(1, (drawY - startY) / (endY - startY)));
-      var len = total * t;
-      pathEl.style.strokeDashoffset = total - len;
-      glowEl.style.strokeDashoffset = total - len;
-      if (len > 2 && len < total - 2) {
-        var pt = pathEl.getPointAtLength(len);
-        spark.setAttribute('cx', pt.x); spark.setAttribute('cy', pt.y);
-        halo.setAttribute('cx', pt.x); halo.setAttribute('cy', pt.y);
-        spark.style.display = ''; halo.style.display = '';
-      } else {
-        spark.style.display = 'none'; halo.style.display = 'none';
+      if (!pathEl) { swayTarget = 0; return; }
+      var sy = window.scrollY || window.pageYOffset;
+      if (!reduce) {
+        var drawY = sy + window.innerHeight * 0.55;
+        var t = Math.max(0, Math.min(1, (drawY - startY) / (endY - startY)));
+        var len = total * t;
+        pathEl.style.strokeDashoffset = total - len;
+        glowEl.style.strokeDashoffset = total - len;
+        if (len > 2 && len < total - 2) {
+          var pt = pathEl.getPointAtLength(len);
+          spark.setAttribute('cx', pt.x); spark.setAttribute('cy', pt.y);
+          halo.setAttribute('cx', pt.x); halo.setAttribute('cy', pt.y);
+          spark.style.display = ''; halo.style.display = '';
+        } else {
+          spark.style.display = 'none'; halo.style.display = 'none';
+        }
       }
+      // river sway: drift the page toward wherever the line runs mid-screen
+      if (reduce || document.body.classList.contains('editing')) { swayTarget = 0; return; }
+      var midY = sy + window.innerHeight * 0.5;
+      var mt = Math.max(0, Math.min(1, (midY - startY) / (endY - startY)));
+      if (mt <= 0 || mt >= 1) { swayTarget = 0; return; }
+      var mp = pathEl.getPointAtLength(total * mt);
+      var raw = (pageCx - mp.x) * 0.22;
+      swayTarget = Math.max(-64, Math.min(64, raw));
     }
+
+    function swayLoop() {
+      swayCur += (swayTarget - swayCur) * 0.06;
+      if (Math.abs(swayCur) < 0.05 && swayTarget === 0) swayCur = 0;
+      var tf = swayCur === 0 ? '' : 'translate3d(' + swayCur.toFixed(2) + 'px,0,0)';
+      if (flow) flow.style.transform = tf;
+      if (svg) svg.style.transform = tf;
+      requestAnimationFrame(swayLoop);
+    }
+    requestAnimationFrame(swayLoop);
 
     window.addEventListener('scroll', function () {
       if (!ticking) { ticking = true; requestAnimationFrame(update); }
