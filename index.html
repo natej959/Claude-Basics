@@ -741,19 +741,28 @@
     .vf-label span { text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--text-3); }
     .contact-toggle { display: flex; gap: 0.5rem; }
     .toggle-btn {
+      flex: 1; position: relative; display: flex;
+      cursor: pointer;
+    }
+    .toggle-btn input {
+      position: absolute; inset: 0; opacity: 0; margin: 0;
+      width: 100%; height: 100%; cursor: pointer;
+    }
+    .toggle-btn span {
       flex: 1;
-      padding: 0.6rem 0.4rem;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0.65rem 0.4rem;
       background: rgba(255,255,255,0.05);
       border: 1px solid var(--line);
       border-radius: 8px;
       color: var(--text-3);
       font-size: 0.78rem; font-weight: 600;
-      font-family: 'Inter', sans-serif;
-      cursor: pointer;
+      pointer-events: none;
       transition: border-color 0.2s, color 0.2s, background 0.2s;
     }
-    .toggle-btn:hover:not(.active) { border-color: var(--line-gold); color: var(--text-2); }
-    .toggle-btn.active { background: var(--gold-10); border-color: var(--gold); color: var(--gold-light); }
+    .toggle-btn:hover span { border-color: var(--line-gold); color: var(--text-2); }
+    .toggle-btn input:checked + span { background: var(--gold-10); border-color: var(--gold); color: var(--gold-light); }
+    .toggle-btn input:focus-visible + span { outline: 2px solid var(--gold-light); outline-offset: 2px; }
     .f-hint { font-size: 0.74rem; color: var(--text-3); font-style: italic; }
     .int-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; }
     .int-chip { position: relative; }
@@ -1355,12 +1364,11 @@
       </div>
       <div class="f-field">
         <label id="sp-contact-label">Best way to reach you</label>
-        <div class="contact-toggle" role="group" aria-labelledby="sp-contact-label">
-          <button type="button" class="toggle-btn active" id="sp-tab-email">Email</button>
-          <button type="button" class="toggle-btn" id="sp-tab-phone">Phone</button>
-          <button type="button" class="toggle-btn" id="sp-tab-instagram">Instagram</button>
+        <div class="contact-toggle" role="radiogroup" aria-labelledby="sp-contact-label">
+          <label class="toggle-btn"><input type="radio" name="contact_type" value="email" checked /><span>Email</span></label>
+          <label class="toggle-btn"><input type="radio" name="contact_type" value="phone" /><span>Phone</span></label>
+          <label class="toggle-btn"><input type="radio" name="contact_type" value="instagram" /><span>Instagram</span></label>
         </div>
-        <input type="hidden" name="contact_type" id="sp-contact-type" value="email" />
         <input type="text" id="sp-contact" name="contact" placeholder="you@business.com" required />
         <p class="f-hint" id="sp-hint">We'll email you back within a day or two</p>
       </div>
@@ -1534,12 +1542,6 @@
 
     function isMobile() { return window.matchMedia('(max-width: 760px)').matches; }
 
-    function nodeEls() {
-      var els = [];
-      document.querySelectorAll('section .label').forEach(function (l) { els.push(l); });
-      return els;
-    }
-
     function build() {
       var old = document.getElementById('journey-line');
       if (old) old.remove();
@@ -1551,25 +1553,51 @@
       var baseY = window.scrollY || window.pageYOffset;
       var cw = document.documentElement.clientWidth;
       pageCx = cw / 2;
-      // riverbanks: just outside the content column, clamped to the screen
-      var containerHalf = Math.min(560, (cw - 40) / 2);
-      var gutter = Math.max(30, (pageCx - containerHalf) * 0.55);
-      var xLeft  = Math.max(28, pageCx - (containerHalf + gutter));
-      var xRight = Math.min(cw - 28, pageCx + (containerHalf + gutter));
+      // banks sit centered in the empty gutter beside the card column
+      var contentHalf = Math.min(560, cw / 2) - 40;
+      var edgeL = pageCx - contentHalf, edgeR = pageCx + contentHalf;
+      var xLeft  = Math.max(18, edgeL * 0.45);
+      var xRight = Math.min(cw - 18, edgeR + (cw - edgeR) * 0.55);
+      var meander = Math.max(0, Math.min(16, (edgeL - xLeft) * 0.4));
 
-      var pts = [];
+      // Routing rule: run down a gutter beside each section's content,
+      // cross the page only in the empty padding bands between sections
+      var sections = Array.prototype.slice.call(document.querySelectorAll('#flow > section'));
+      if (sections.length < 2) return;
       var heroR = hero.getBoundingClientRect();
-      pts.push([pageCx, heroR.bottom + baseY + 8]);
-      var els = nodeEls();
-      els.forEach(function (el, i) {
-        var r = el.getBoundingClientRect();
-        var x = (i % 2 === 0) ? xLeft : xRight;
-        pts.push([x, r.top + r.height / 2 + baseY]);
-      });
+      var heroBottom = heroR.bottom + baseY;
+      var pts = [[pageCx, heroBottom + 8]];
+
+      for (var i = 0; i < sections.length - 1; i++) {
+        var bx = (i % 2 === 0) ? xLeft : xRight;
+        var inward = (i % 2 === 0) ? 1 : -1;
+        var cs = getComputedStyle(sections[i]);
+        var padTopThis = parseFloat(cs.paddingTop) || 90;
+        var padBotThis = parseFloat(cs.paddingBottom) || 90;
+        var sTop = sections[i].getBoundingClientRect().top + baseY;
+        var nextTop = sections[i + 1].getBoundingClientRect().top + baseY;
+        var entryY = (i === 0)
+          ? Math.max(sTop + padTopThis - 20, heroBottom + 90)
+          : sTop + Math.max(32, padTopThis - 18);
+        var exitY = nextTop - Math.max(32, padBotThis - 18);
+        if (exitY <= entryY + 30) { exitY = entryY + 30; }
+        pts.push([bx, entryY]);
+        var span = exitY - entryY;
+        if (span > 520) {
+          var bows = span > 1200 ? 2 : 1;
+          for (var m = 1; m <= bows; m++) {
+            var dir = (m % 2 === 1) ? 1 : -1;
+            pts.push([bx + dir * inward * meander, entryY + span * m / (bows + 1)]);
+          }
+        }
+        pts.push([bx, exitY]);
+      }
       var logo = document.querySelector('#contact .cta-logo');
       if (logo) {
         var lr = logo.getBoundingClientRect();
         pts.push([pageCx, lr.top + lr.height / 2 + baseY]);
+      } else {
+        pts.push([pageCx, sections[sections.length - 1].getBoundingClientRect().top + baseY + 200]);
       }
       if (pts.length < 3) return;
 
@@ -1634,8 +1662,8 @@
       var mt = Math.max(0, Math.min(1, (midY - startY) / (endY - startY)));
       if (mt <= 0 || mt >= 1) { swayTarget = 0; return; }
       var mp = pathEl.getPointAtLength(total * mt);
-      var raw = (pageCx - mp.x) * 0.22;
-      swayTarget = Math.max(-64, Math.min(64, raw));
+      var raw = (pageCx - mp.x) * 0.14;
+      swayTarget = Math.max(-42, Math.min(42, raw));
     }
 
     function swayLoop() {
@@ -1665,17 +1693,16 @@
       phone:     { placeholder: '(619) 555-0100',   hint: "We'll call or text you back" },
       instagram: { placeholder: '@yourhandle',      hint: "We'll DM you back from @stacarclub" }
     };
-    var typeField = document.getElementById('sp-contact-type');
     var contactInput = document.getElementById('sp-contact');
     var hint = document.getElementById('sp-hint');
-    ['email', 'phone', 'instagram'].forEach(function (t) {
-      document.getElementById('sp-tab-' + t).addEventListener('click', function () {
-        typeField.value = t;
-        ['email', 'phone', 'instagram'].forEach(function (x) {
-          document.getElementById('sp-tab-' + x).classList.toggle('active', x === t);
-        });
-        contactInput.placeholder = spConfig[t].placeholder;
-        hint.textContent = spConfig[t].hint;
+    var radios = document.querySelectorAll('.contact-toggle input[name="contact_type"]');
+    radios.forEach(function (r) {
+      r.addEventListener('change', function () {
+        if (!r.checked) return;
+        var cfg = spConfig[r.value];
+        if (!cfg) return;
+        contactInput.placeholder = cfg.placeholder;
+        hint.textContent = cfg.hint;
         contactInput.value = '';
       });
     });
