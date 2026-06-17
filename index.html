@@ -1553,12 +1553,13 @@
       var baseY = window.scrollY || window.pageYOffset;
       var cw = document.documentElement.clientWidth;
       pageCx = cw / 2;
-      // banks sit centered in the empty gutter beside the card column
+      // banks hug just outside the card column so crossings stay short
       var contentHalf = Math.min(560, cw / 2) - 40;
       var edgeL = pageCx - contentHalf, edgeR = pageCx + contentHalf;
-      var xLeft  = Math.max(18, edgeL * 0.45);
-      var xRight = Math.min(cw - 18, edgeR + (cw - edgeR) * 0.55);
-      var meander = Math.max(0, Math.min(16, (edgeL - xLeft) * 0.4));
+      var off = 50;
+      var xLeft  = Math.max(18, edgeL - off);
+      var xRight = Math.min(cw - 18, edgeR + off);
+      var meander = Math.max(0, Math.min(14, (edgeL - xLeft) * 0.4));
 
       // Routing rule: run down a gutter beside each section's content,
       // cross the page only in the empty padding bands between sections
@@ -1601,13 +1602,23 @@
       }
       if (pts.length < 3) return;
 
-      var d = 'M ' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
-      for (var i = 1; i < pts.length; i++) {
-        var p0 = pts[i - 1], p1 = pts[i], dy = p1[1] - p0[1];
-        d += ' C ' + p0[0].toFixed(1) + ' ' + (p0[1] + dy * 0.5).toFixed(1) +
-             ', ' + p1[0].toFixed(1) + ' ' + (p1[1] - dy * 0.5).toFixed(1) +
-             ', ' + p1[0].toFixed(1) + ' ' + p1[1].toFixed(1);
+      // Build a path with big, soft rounded corners: straight runs joined
+      // by generous fillets so no transition feels sharp
+      var R = 130;
+      function jf(p) { return p[0].toFixed(1) + ' ' + p[1].toFixed(1); }
+      var d = 'M ' + jf(pts[0]);
+      for (var k = 1; k < pts.length - 1; k++) {
+        var a = pts[k - 1], b = pts[k], c = pts[k + 1];
+        var v1x = b[0] - a[0], v1y = b[1] - a[1];
+        var v2x = c[0] - b[0], v2y = c[1] - b[1];
+        var l1 = Math.hypot(v1x, v1y), l2 = Math.hypot(v2x, v2y);
+        if (l1 < 1 || l2 < 1) continue;
+        var r = Math.min(R, l1 / 2, l2 / 2);
+        var p1 = [b[0] - v1x / l1 * r, b[1] - v1y / l1 * r];
+        var p2 = [b[0] + v2x / l2 * r, b[1] + v2y / l2 * r];
+        d += ' L ' + jf(p1) + ' Q ' + jf(b) + ' ' + jf(p2);
       }
+      d += ' L ' + jf(pts[pts.length - 1]);
       var NS = 'http://www.w3.org/2000/svg';
       var h = document.documentElement.scrollHeight;
       svg = document.createElementNS(NS, 'svg');
